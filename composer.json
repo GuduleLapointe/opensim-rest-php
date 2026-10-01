@@ -9,6 +9,9 @@
       "email": "olivier@van-helden.net"
     }
   ],
+  "require": {
+    "php": ">=7.0"
+  },
   "require-dev": {
     "clue/phar-composer": "^1.4"
   },
