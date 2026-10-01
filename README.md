@@ -45,7 +45,7 @@ The executable is created at `bin/opensim-rest-cli`.
 
 ## Command-line client
 
-[Download the executable](https://raw.githubusercontent.com/magicoli/opensim-rest-php/master/opensim-rest-cli) from this repository, make sure `opensim-rest-cli` is executable and move it to /usr/local/bin/.
+[Download the executable](https://raw.githubusercontent.com/magicoli/opensim-rest-php/master/bin/opensim-rest-cli) from this repository, make sure `opensim-rest-cli` is executable and move it to /usr/local/bin/.
 
 ```bash
 chmod +x /path/to/opensim-rest-cli
@@ -60,6 +60,18 @@ opensim-rest-cli /path/to/Robust.ini show regions
 ```
 
 If you save the credentials in ~/.opensim-rest-cli.ini, you can skip the Robust.ini argument.
+
+Other ways to give the commands and reach the console:
+
+```bash
+opensim-rest-cli --ini /path/to/OpenSim.ini -- show regions   # one command
+opensim-rest-cli --ini /path/to/Robust.ini --host 127.0.0.1 -- show info   # from the machine itself, instead of BaseURL
+echo "show info" | opensim-rest-cli --ini /path/to/Robust.ini -   # the lines of the standard input, one command or answer each
+opensim-rest-cli --ini /path/to/Robust.ini --repl   # a prompt, as the console of the instance
+OPENSIM_REST_PASSWORD=secret opensim-rest-cli --url http://host:9300 --user admin -- show info
+```
+
+The client waits for the console to be ready again after each line (`--wait SECONDS`, 5 by default), so a command that asks a question gets its answer from the next line. It exits with 0 when done, 1 when the console cannot be reached or opened, 2 on a wrong usage; the errors go to the standard error.
 
 ```bash
 opensim-rest-cli show info

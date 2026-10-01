@@ -6,6 +6,10 @@
  * This script provides a command-line interface to communicate with a Robust or OpenSimulator instance
  * with REST console enabled.
  *
+ * The console is reached from the config of an instance (an ini file, [Const] BaseURL and
+ * [Network] ConsolePort, ConsoleUser, ConsolePass) or from an URL, a user and a password.
+ * Run it with --help for the options.
+ *
  * @package opensim-rest-php
  * @category Command-line tools
  * @version 1.0.5
@@ -139,7 +143,7 @@ function array_get_case_insensitive( $array, $key ) {
 function get_option( $option, $default = null ) {
 	$scriptFilename = __FILE__;
 	$scriptBasename = pathinfo( $scriptFilename, PATHINFO_FILENAME );
-	$defaultIniFile = $_SERVER['HOME'] . '/.' . $scriptBasename . '.ini';
+	$defaultIniFile = getenv( 'HOME' ) . '/.' . $scriptBasename . '.ini';
 
 	$additionalIni = isset( $GLOBALS['additional_ini'] ) ? $GLOBALS['additional_ini'] : '';
 
@@ -149,7 +153,7 @@ function get_option( $option, $default = null ) {
 		case 'opensim_rest_config':
 			$constSection   = array_get_case_insensitive( $config, 'Const' ) ?? [];
 			$networkSection = array_get_case_insensitive( $config, 'Network' ) ?? [];
-			$baseURL     = array_get_case_insensitive( $constSection, 'BaseURL' ) ?? 'localhost';
+			$baseURL     = $GLOBALS['console_host'] ?? array_get_case_insensitive( $constSection, 'BaseURL' ) ?? 'localhost';
 			$consolePort = array_get_case_insensitive( $networkSection, 'ConsolePort' )
 			            ?? array_get_case_insensitive( $networkSection, 'console_port' )
 			            ?? 8002;
@@ -182,39 +186,208 @@ function get_option( $option, $default = null ) {
 	return $default;
 }
 
-$firstArgument = isset( $argv[1] ) ? $argv[1] : '';
-$additionalIni = null;
-if ( file_exists( $firstArgument ) && is_file( $firstArgument ) && is_readable( $firstArgument ) ) {
-	$additionalIni = $firstArgument;
-	$command       = implode( ' ', array_slice( $argv, 2 ) );
+/**
+ * Prints the usage.
+ *
+ * @param resource $stream Where to print, STDOUT or STDERR.
+ */
+function usage( $stream = STDOUT ) {
+	fwrite(
+		$stream,
+		<<<'USAGE'
+Usage:
+  opensim-rest-cli [<ini_file>] <command>             one command, the config is read from the ini file
+  opensim-rest-cli [options] -- <command>             one command
+  opensim-rest-cli [options] -                        the lines of the standard input, one command or answer each
+                                                      (an empty line answers a question with its default)
+  opensim-rest-cli [options] --repl                   a prompt, as the console of the instance
+
+Options:
+  --ini FILE        config of the instance: [Const] BaseURL, [Network] ConsolePort (or console_port),
+                    ConsoleUser and ConsolePass, added to ~/.opensim-rest-cli.ini
+  --host HOST       reach the console at HOST instead of BaseURL (e.g. 127.0.0.1 from the machine itself)
+  --url URL         reach the console at URL (http://HOST:PORT) with --user, the password is in the
+                    environment variable OPENSIM_REST_PASSWORD
+  --user USER       console user, with --url
+  --wait SECONDS    how long to wait for the console to be ready again after a line (default 5)
+  -h, --help        this help
+
+Exit code: 0 done, 1 cannot reach or open the console, 2 usage.
+
+USAGE
+	);
+}
+
+/**
+ * Reads the arguments.
+ *
+ * @param array $args Arguments, without the script name.
+ * @return array|string The options, or an error message.
+ */
+function read_arguments( $args ) {
+	$options = array(
+		'ini'     => null,
+		'host'    => null,
+		'url'     => null,
+		'user'    => null,
+		'wait'    => 5.0,
+		'mode'    => null,
+		'command' => array(),
+	);
+
+	// Legacy form: an ini file as first argument, the rest is the command
+	if ( isset( $args[0] ) && '-' !== $args[0] && is_file( $args[0] ) && is_readable( $args[0] ) ) {
+		$options['ini']     = array_shift( $args );
+		$options['mode']    = 'command';
+		$options['command'] = $args;
+		return $options;
+	}
+
+	// Legacy form too: no option, the whole line is the command, the config is in ~/.opensim-rest-cli.ini
+	if ( isset( $args[0] ) && '-' !== substr( $args[0], 0, 1 ) ) {
+		$options['mode']    = 'command';
+		$options['command'] = $args;
+		return $options;
+	}
+
+	while ( $args ) {
+		$arg = array_shift( $args );
+		switch ( $arg ) {
+			case '--ini':
+			case '--host':
+			case '--url':
+			case '--user':
+				if ( ! $args ) {
+					return "$arg needs a value";
+				}
+				$options[ ltrim( $arg, '-' ) ] = array_shift( $args );
+				break;
+
+			case '--wait':
+				if ( ! $args ) {
+					return '--wait needs a value';
+				}
+				$options['wait'] = (float) array_shift( $args );
+				break;
+
+			case '--repl':
+				$options['mode'] = 'repl';
+				break;
+
+			case '-':
+				$options['mode'] = 'stdin';
+				break;
+
+			case '--':
+				$options['mode']    = 'command';
+				$options['command'] = $args;
+				$args               = array();
+				break;
+
+			case '-h':
+			case '--help':
+				$options['mode'] = 'help';
+				break;
+
+			default:
+				return "unknown argument $arg";
+		}
+	}
+
+	return $options;
+}
+
+/**
+ * Types a line in the console and prints what it answers.
+ *
+ * @param OpenSim_Rest $rest Open session.
+ * @param string       $line Line to type.
+ * @param float        $wait Seconds to wait for the console to be ready again.
+ * @return bool False when the console is gone.
+ */
+function send_line( $rest, $line, $wait ) {
+	$result = $rest->command( $line, $wait );
+	foreach ( $result['lines'] as $text ) {
+		echo $text, "\n";
+	}
+
+	return ! $result['closed'];
+}
+
+$options = read_arguments( array_slice( $argv, 1 ) );
+if ( is_string( $options ) ) {
+	fwrite( STDERR, "opensim-rest-cli: $options\n" );
+	usage( STDERR );
+	exit( 2 );
+}
+if ( 'help' === $options['mode'] ) {
+	usage();
+	exit( 0 );
+}
+if ( null === $options['mode'] || ( null === $options['ini'] && null === $options['url'] && ! is_file( getenv( 'HOME' ) . '/.opensim-rest-cli.ini' ) ) ) {
+	usage( STDERR );
+	exit( 2 );
+}
+
+if ( null !== $options['url'] ) {
+	$password = (string) getenv( 'OPENSIM_REST_PASSWORD' );
+	if ( null === $options['user'] || '' === $password ) {
+		fwrite( STDERR, "opensim-rest-cli: --url needs --user and OPENSIM_REST_PASSWORD\n" );
+		exit( 2 );
+	}
+	$rest_args = array(
+		'uri'         => $options['url'],
+		'ConsoleUser' => $options['user'],
+		'ConsolePass' => $password,
+	);
 } else {
-	$command = implode( ' ', array_slice( $argv, 1 ) );
-}
-
-if ( empty( $command ) ) {
-	error_log( 'Usage: php opensim-rest-cli.php [<ini_file>] <command>' );
-	exit;
-}
-
-$GLOBALS['additional_ini'] = $additionalIni;
-
-$rest_args = get_option( 'opensim_rest_config' );
-
-if ( is_opensim_rest_error( $rest_args ) ) {
-	die( 'Error reading config: ' . $rest_args->getMessage() . "\n" );
-}
-
-$session = opensim_rest_session( $rest_args );
-if ( is_opensim_rest_error( $session ) ) {
-	echo 'OpenSim_Rest error: ' . $session->getMessage() . "\n";
-} elseif ( ( ! $session ) ) {
-	echo "OpenSim_Rest new session unknown error\n";
-} else {
-	// Send the command and retrieve the lines of the response
-	$responseLines = $session->sendCommand( $command );
-	if ( is_opensim_rest_error( $responseLines ) ) {
-		echo 'OpenSim_Rest->sendCommand error: ' . $responseLines->getMessage() . "\n";
-	} elseif ( is_array( $responseLines ) ) {
-		echo trim( join( "\n", $responseLines ) ) . "\n";
+	$GLOBALS['additional_ini'] = $options['ini'];
+	if ( null !== $options['host'] ) {
+		$GLOBALS['console_host'] = $options['host'];
+	}
+	$rest_args = get_option( 'opensim_rest_config' );
+	if ( is_opensim_rest_error( $rest_args ) ) {
+		fwrite( STDERR, 'opensim-rest-cli: error reading config: ' . $rest_args->getMessage() . "\n" );
+		exit( 1 );
 	}
 }
+
+$rest = opensim_rest_session( $rest_args );
+if ( is_opensim_rest_error( $rest ) ) {
+	fwrite( STDERR, 'opensim-rest-cli: ' . $rest->getMessage() . "\n" );
+	exit( 1 );
+}
+if ( ! $rest->connected() ) {
+	fwrite( STDERR, 'opensim-rest-cli: ' . $rest->reason . "\n" );
+	exit( 1 );
+}
+
+switch ( $options['mode'] ) {
+	case 'command':
+		send_line( $rest, implode( ' ', $options['command'] ), $options['wait'] );
+		break;
+
+	case 'stdin':
+		while ( false !== ( $line = fgets( STDIN ) ) ) {
+			if ( ! send_line( $rest, rtrim( $line, "\r\n" ), $options['wait'] ) ) {
+				break;
+			}
+		}
+		break;
+
+	case 'repl':
+		while ( true ) {
+			echo '' !== $rest->prompt ? $rest->prompt : '> ';
+			$line = fgets( STDIN );
+			if ( false === $line ) {
+				echo "\n";
+				break;
+			}
+			if ( ! send_line( $rest, rtrim( $line, "\r\n" ), $options['wait'] ) ) {
+				break;
+			}
+		}
+		break;
+}
+
+$rest->close();

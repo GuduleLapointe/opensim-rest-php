@@ -266,6 +266,8 @@ class OpenSim_Rest {
 
 		list( $status, $body ) = $this->post( '/CloseSession/', array( 'ID' => $this->sessionID ), 2 );
 		$this->sessionID       = '';
+		// Nothing more to ask: free the handle, which closes the connection
+		$this->ch = null;
 
 		if ( 0 === $status ) {
 			return new Error( 'Rest close session_error' );
