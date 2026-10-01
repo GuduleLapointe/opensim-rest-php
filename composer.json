@@ -10,15 +10,33 @@
     }
   ],
   "require": {
-    "php": ">=7.0"
+    "php": ">=8.2",
+    "ext-curl": "*",
+    "ext-libxml": "*",
+    "ext-simplexml": "*"
   },
   "require-dev": {
-    "clue/phar-composer": "^1.4"
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.2",
+    "magicoli/pest-failure-summary": "^1.0",
+    "pestphp/pest": "^3.0",
+    "phpcompatibility/php-compatibility": "dev-develop",
+    "squizlabs/php_codesniffer": "^4.0"
   },
   "autoload": {
     "files": [
       "class-rest.php"
     ]
   },
-  "scripts": {}
+  "scripts": {
+    "test": "pest"
+  },
+  "config": {
+    "platform": {
+      "php": "8.2.0"
+    },
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true,
+      "pestphp/pest-plugin": true
+    }
+  }
 }

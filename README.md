@@ -11,6 +11,12 @@ It can be used inside a PHP project, or as a command-line client for OpenSimulat
 
 Available commands can be found here: <http://opensimulator.org/wiki/Server_Commands>
 
+## Requirements
+
+PHP 8.2 or newer, with the `curl`, `libxml` and `simplexml` extensions.
+
+On Debian and Ubuntu: `sudo apt install php-cli php-curl php-xml`.
+
 ## Prerequisites
 
 Remote connection must be enabled in your Robust .ini file.
