@@ -19,7 +19,8 @@ $phar = new Phar( $pharFile, 0, "$execName.phar" );
 $phar->startBuffering();
 
 // Add files to the Phar archive
-$phar->buildFromDirectory( $baseDir, '/\.php$/' );
+// The code only, not the development tools (vendor, tests, dev)
+$phar->buildFromDirectory( $baseDir, '#^(?!.*/(vendor|tests|dev)/).*\.php$#' );
 
 // Set the default stub for the Phar archive
 $defaultStub = $phar->createDefaultStub( 'opensim-rest-cli.php' );

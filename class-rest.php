@@ -103,13 +103,8 @@ class OpenSim_Rest {
 	 */
 	public function __destruct() {
 		$this->close();
-		if ( ! empty( $this->ch ) ) {
-			// Deprecated since PHP 8.5, the handle is freed with the object since PHP 8.0
-			if ( PHP_VERSION_ID < 80000 ) {
-				curl_close( $this->ch );
-			}
-			$this->ch = null;
-		}
+		// The curl handle is freed with its object
+		$this->ch = null;
 	}
 
 	/**
