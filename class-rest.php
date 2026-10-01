@@ -16,10 +16,39 @@
  * @link https://magiiic.com/donate/project/?project=opensim-rest-php
  */
 
+/**
+ * The remote (REST) console of a Robust or an OpenSimulator instance, which
+ * gives every command of its console through one port.
+ *
+ * The protocol, as OpenSimulator serves it (Framework/Console/RemoteConsole.cs):
+ *  - StartSession: a form with USER and PASS, answered with a SessionID (401
+ *    when they are wrong);
+ *  - SessionCommand: a form with ID and COMMAND, a line typed in the console;
+ *  - ReadResponses/<ID>/: the lines the console wrote since the last reading,
+ *    waiting (up to 25 seconds) when there are none. A line has Input when it
+ *    is the echo of what was typed, and Prompt when the console waits for input
+ *    (Command as well when it is for a new command, else it is a question);
+ *  - CloseSession: a form with ID.
+ *
+ * The console is one for everybody: the lines typed in a session go to the
+ * console of the instance, and every session sees all the output.
+ */
 class OpenSim_Rest {
 	private $url;
 	private $ch;
 	private $sessionID;
+
+	/**
+	 * @var Error|null Why the session could not be opened (bad address, wrong credentials,
+	 *                 no session in the answer). Not set when the instance is just offline.
+	 */
+	public $error = null;
+
+	/** @var string Why there is no session, including when the instance is offline. */
+	public $reason = '';
+
+	/** @var string The last prompt the console showed. */
+	public $prompt = '';
 
 	/**
 	 * OpenSim_Rest constructor.
@@ -48,13 +77,14 @@ class OpenSim_Rest {
 				'port'   => ( $c['uri'] == (int) $c['uri'] ) ? $c['uri'] : null,
 			),
 			$c,
-			parse_url( $c['uri'] )
+			(array) parse_url( (string) $c['uri'] )
 		);
 
 		$this->url = "{$c['scheme']}://{$c['host']}:{$c['port']}";
 
 		if ( empty( $c['host'] ) || empty( $c['port'] ) ) {
-			$this->error = new Error( "Invalid URL $this->url from {$c['uri']}" );
+			$this->reason = "Invalid URL $this->url from {$c['uri']}";
+			$this->error  = new Error( $this->reason );
 			return;
 		}
 
@@ -63,7 +93,6 @@ class OpenSim_Rest {
 		$session = $this->startSession( $c['ConsoleUser'], $c['ConsolePass'] );
 		if ( is_opensim_rest_error( $session ) ) {
 			$this->error = $session;
-			return;
 		}
 	}
 
@@ -73,12 +102,23 @@ class OpenSim_Rest {
 	 * Cleans up any resources used by the OpenSim_Rest instance.
 	 */
 	public function __destruct() {
+		$this->close();
 		if ( ! empty( $this->ch ) ) {
-			// Close the session
-			$this->closeSession();
-
-			curl_close( $this->ch );
+			// Deprecated since PHP 8.5, the handle is freed with the object since PHP 8.0
+			if ( PHP_VERSION_ID < 80000 ) {
+				curl_close( $this->ch );
+			}
+			$this->ch = null;
 		}
+	}
+
+	/**
+	 * Tell if a session is open.
+	 *
+	 * @return bool
+	 */
+	public function connected() {
+		return ! empty( $this->sessionID );
 	}
 
 	/**
@@ -86,149 +126,238 @@ class OpenSim_Rest {
 	 *
 	 * @param string $ConsoleUser The username for authentication.
 	 * @param string $ConsolePass The password for authentication.
-	 * @return string|Error The session ID if successful, or an Error object if an error occurred.
+	 * @return string|Error|false The session ID if successful, false when the instance is offline
+	 *                            (not an error, no need to clutter the error log with this), or an
+	 *                            Error object if an error occurred.
 	 */
 	private function startSession( $ConsoleUser, $ConsolePass ) {
-		$startSessionUrl    = $this->url . '/StartSession/';
-		$startSessionParams = array(
-			'USER' => $ConsoleUser,
-			'PASS' => $ConsolePass,
+		list( $status, $body ) = $this->post(
+			'/StartSession/',
+			array(
+				'USER' => $ConsoleUser,
+				'PASS' => $ConsolePass,
+			),
+			5
 		);
 
-		curl_setopt( $this->ch, CURLOPT_URL, $startSessionUrl );
-		curl_setopt( $this->ch, CURLOPT_RETURNTRANSFER, true );
-		curl_setopt( $this->ch, CURLOPT_POST, true );
-		curl_setopt( $this->ch, CURLOPT_POSTFIELDS, http_build_query( $startSessionParams ) );
-
-		// Execute the request to start a session
-		$startSessionResponse = curl_exec( $this->ch );
-		// Check for errors
-		if ( ! $startSessionResponse ) {
-			// return new Error( trim( 'Unable to start session ' . curl_error( $this->ch ) ) . ' in ' . __FILE__ . ' on line ' . __LINE__ );
-			// The simulator is probably offline, no need to clutter the error log with this.
+		if ( 0 === $status ) {
+			$this->reason = "cannot reach the console at {$this->url} (the instance is not running, or not with its remote console)";
 			return false;
 		}
 
-		// Parse the session ID from the start session response
-		$startSessionXml = simplexml_load_string( $startSessionResponse );
-		if ( $startSessionXml !== false && isset( $startSessionXml->SessionID ) ) {
-			$this->sessionID = (string) $startSessionXml->SessionID;
+		if ( 401 === $status ) {
+			$this->reason = 'the user or the password of the console is wrong';
+			return new Error( $this->reason );
 		}
 
-		if ( empty( $this->sessionID ) ) {
-			return new Error( trim( 'Unable to get a session ID ' . curl_error( $this->ch ) ) . ' in ' . __FILE__ . ' on line ' . __LINE__ );
+		$xml = $this->xml( $body );
+		if ( $xml === false || empty( $xml->SessionID ) ) {
+			$this->reason = "no session from the console at {$this->url} (HTTP $status)";
+			return new Error( $this->reason );
 		}
+
+		$this->sessionID = (string) $xml->SessionID;
+		$this->prompt    = (string) $xml->Prompt;
 
 		return $this->sessionID;
+	}
+
+	/**
+	 * Types a line in the console, and gives what it answers: the lines written
+	 * until the console waits for input again (a command prompt: done, or a
+	 * question: the console wants an answer, typed with the next call), or until
+	 * $wait seconds pass. An instance that stops, like after shutdown, ends the
+	 * connection: not an error.
+	 *
+	 * @param string $line The line to type.
+	 * @param float  $wait Seconds to wait for the console to be ready again.
+	 * @return array {
+	 *   @type string[] $lines    The lines the console wrote as an answer.
+	 *   @type string   $prompt   The last prompt of the console.
+	 *   @type bool     $question The console asks a question (answer it with the next call).
+	 *   @type bool     $closed   The connection is gone.
+	 * }
+	 */
+	public function command( $line, $wait = 5.0 ) {
+		$result = array(
+			'lines'    => array(),
+			'prompt'   => $this->prompt,
+			'question' => false,
+			'closed'   => false,
+		);
+
+		if ( ! $this->connected() ) {
+			$result['closed'] = true;
+			return $result;
+		}
+
+		list( $status ) = $this->post(
+			'/SessionCommand/',
+			array(
+				'ID'      => $this->sessionID,
+				'COMMAND' => $line,
+			),
+			5
+		);
+		if ( 200 !== $status ) {
+			$result['closed'] = true;
+			return $result;
+		}
+
+		// What the console wrote before the echo of the line is not an answer to it
+		$echoed = false;
+		$end    = microtime( true ) + $wait;
+		while ( microtime( true ) < $end ) {
+			$started = microtime( true );
+			$entries = $this->read( min( 2.0, max( 0.2, $end - microtime( true ) ) ) );
+			if ( null === $entries ) {
+				$result['closed'] = true;
+				break;
+			}
+			if ( array() === $entries && microtime( true ) - $started < 0.05 ) {
+				usleep( 100000 );
+			}
+			foreach ( $entries as $entry ) {
+				if ( $entry['input'] ) {
+					$echoed = true;
+					continue;
+				}
+				if ( ! $echoed ) {
+					continue;
+				}
+				if ( $entry['prompt'] ) {
+					$this->prompt       = $entry['text'];
+					$result['prompt']   = $entry['text'];
+					$result['question'] = ! $entry['command'];
+					return $result;
+				}
+				$result['lines'][] = $entry['text'];
+			}
+		}
+
+		return $result;
 	}
 
 	/**
 	 * Sends a command to the REST console.
 	 *
 	 * @param string $command The command to send.
-	 * @return array|Error An array containing the lines of response if successful, or an Error object if an error occurred.
+	 * @return array|false|Error An array containing the lines of response if successful, false when
+	 *                           the console wrote nothing, or an Error object if an error occurred.
 	 */
 	public function sendCommand( $command ) {
-		$sessionCommandUrl    = $this->url . '/SessionCommand/';
-		$sessionCommandParams = array(
-			'ID'      => $this->sessionID,
-			'COMMAND' => $command,
-		);
-
-		curl_setopt( $this->ch, CURLOPT_URL, $sessionCommandUrl );
-		curl_setopt( $this->ch, CURLOPT_TIMEOUT, 3 );
-		// curl_setopt($this->ch, CURLOPT_TCP_KEEPALIVE, 30); // test
-		// curl_setopt($this->ch, CURLOPT_FOLLOWLOCATION, true); // test
-		// curl_setopt($this->ch, CURLOPT_SSL_VERIFYPEER, false); // test
-		// curl_setopt($this->ch, CURLOPT_SSL_VERIFYHOST, false); // test
-		// curl_setopt($this->ch, CURLOPT_ENCODING, true); // test
-		curl_setopt( $this->ch, CURLOPT_POSTFIELDS, http_build_query( $sessionCommandParams ) );
-
-		// Execute the request to send a command
-		$sessionCommandResponse = curl_exec( $this->ch );
-
-		// Check for errors
-		if ( $sessionCommandResponse == false ) {
-			return new Error( trim( 'Rest command error ', curl_error( $this->ch ) ) );
+		if ( ! $this->connected() ) {
+			return new Error( 'Rest command error: ' . ( $this->reason ?: 'no session' ) );
 		}
 
-		// Add a small delay to make sure the response is ready beore fetching it.
-		usleep( 10000 ); // in microseconds
-
-		// Retrieve the command output
-		$readResponsesUrl = $this->url . "/ReadResponses/{$this->sessionID}/";
-
-		// Prepare cURL request for reading responses
-		// curl_setopt($this->ch, CURLOPT_TIMEOUT, 30);
-		curl_setopt( $this->ch, CURLOPT_URL, $readResponsesUrl );
-
-		// Execute the request to read responses
-		$readResponsesResponse = curl_exec( $this->ch );
-
-		// Check for errors
-		if ( $readResponsesResponse === false ) {
-			return new Error( trim( 'Rest response error ' . curl_error( $this->ch ) ) );
+		$result = $this->command( $command, 3.0 );
+		if ( $result['closed'] && empty( $result['lines'] ) ) {
+			return new Error( 'Rest response error: the console closed the connection' );
 		}
 
-		// // Close the session
-		// $this->closeSession();
-		//
-		// Extract the lines of the response
-		$commandResponseXml = simplexml_load_string( $readResponsesResponse );
-		$lines              = array();
-		$answers            = array();
-		$storeNumber        = false;
-		if ( $commandResponseXml !== false && isset( $commandResponseXml->Line ) ) {
-			foreach ( $commandResponseXml->Line as $line ) {
-				$lineNumberAttr = (int) $line->attributes()->Number;
-				$isCommand      = ( $line->attributes()->Command == 'true' );
-				$isInput        = ( $line->attributes()->Input == 'true' );
-				$lineValue      = (string) $line;
-
-				if ( $isInput ) {
-					$storeNumber = ( $lineValue === $command ) ? $lineNumberAttr : false;
-					continue;
-				}
-
-				if ( $storeNumber && ! $isCommand && ! $isInput ) {
-					// if($isCommand) {
-					// $lines[] = (string) $line;
-					$answers[ $storeNumber ][] = (string) $line;
-					// }
-				}
-			}
-		}
-		// echo "Full response " . print_r($answers, true);
-		$answers = array_filter( $answers );
-		$lines   = end( $answers );
-		// echo "Answer " . print_r($lines, true);
-
-		return $lines;
+		return empty( $result['lines'] ) ? false : $result['lines'];
 	}
 
 	/**
 	 * Closes the session with the REST console.
 	 *
-	 * @return string|Error The response if successful, or an Error object if an error occurred.
+	 * @return string|Error|null The response if successful, an Error object if an error occurred,
+	 *                           null when there was no session.
 	 */
-	private function closeSession() {
-		$closeSessionUrl    = $this->url . '/CloseSession/';
-		$closeSessionParams = array(
-			'ID' => $this->sessionID,
-		);
-
-		curl_setopt( $this->ch, CURLOPT_URL, $closeSessionUrl );
-		curl_setopt( $this->ch, CURLOPT_POSTFIELDS, http_build_query( $closeSessionParams ) );
-
-		// Execute the request to close the session
-		$closeSessionResponse = curl_exec( $this->ch );
-
-		// Check for errors
-		if ( $closeSessionResponse === false ) {
-			return new Error( trim( 'Rest close session_error ' . curl_error( $this->ch ) ) );
+	public function close() {
+		if ( empty( $this->sessionID ) || empty( $this->ch ) ) {
+			return null;
 		}
 
-		return $closeSessionResponse;
+		list( $status, $body ) = $this->post( '/CloseSession/', array( 'ID' => $this->sessionID ), 2 );
+		$this->sessionID       = '';
+
+		if ( 0 === $status ) {
+			return new Error( 'Rest close session_error' );
+		}
+
+		return $body;
+	}
+
+	/**
+	 * Reads the lines the console wrote since the last reading.
+	 *
+	 * @param float $timeout Seconds to wait for lines when there are none.
+	 * @return array[]|null Entries with text, input, prompt and command, or null when the console is gone.
+	 */
+	private function read( $timeout ) {
+		list( $status, $body, $errno ) = $this->post( "/ReadResponses/{$this->sessionID}/", array(), $timeout );
+
+		if ( 0 === $status ) {
+			// A reading that waits for output and finds none ends by timeout, any other failure is the end of the console
+			return ( defined( 'CURLE_OPERATION_TIMEDOUT' ) ? CURLE_OPERATION_TIMEDOUT : 28 ) === $errno ? array() : null;
+		}
+		if ( 200 !== $status ) {
+			return null;
+		}
+
+		$entries = array();
+		$xml     = $this->xml( $body );
+		if ( $xml !== false && isset( $xml->Line ) ) {
+			foreach ( $xml->Line as $line ) {
+				$entries[] = array(
+					'text'    => (string) $line,
+					'input'   => ( (string) $line['Input'] === 'true' ),
+					'prompt'  => ( (string) $line['Prompt'] === 'true' ),
+					'command' => ( (string) $line['Command'] === 'true' ),
+				);
+			}
+		}
+
+		return $entries;
+	}
+
+	/**
+	 * Posts a form to the console.
+	 *
+	 * @param string $path    The path of the request.
+	 * @param array  $fields  The fields of the form.
+	 * @param float  $timeout Seconds to wait for the answer.
+	 * @return array [ HTTP status (0 when nothing answered), body, curl error number ]
+	 */
+	private function post( $path, $fields, $timeout ) {
+		curl_setopt_array(
+			$this->ch,
+			array(
+				CURLOPT_URL            => $this->url . $path,
+				CURLOPT_POST           => true,
+				CURLOPT_POSTFIELDS     => http_build_query( $fields ),
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_CONNECTTIMEOUT => 3,
+				CURLOPT_TIMEOUT_MS     => (int) round( $timeout * 1000 ),
+			)
+		);
+
+		$body = curl_exec( $this->ch );
+
+		return array(
+			(int) curl_getinfo( $this->ch, CURLINFO_RESPONSE_CODE ),
+			false === $body ? '' : $body,
+			curl_errno( $this->ch ),
+		);
+	}
+
+	/**
+	 * Parses an XML answer of the console.
+	 *
+	 * @param string $body The body of the answer.
+	 * @return SimpleXMLElement|false
+	 */
+	private function xml( $body ) {
+		if ( '' === trim( (string) $body ) ) {
+			return false;
+		}
+		$previous = libxml_use_internal_errors( true );
+		$xml      = simplexml_load_string( $body );
+		libxml_clear_errors();
+		libxml_use_internal_errors( $previous );
+
+		return $xml;
 	}
 }
 
