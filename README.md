@@ -1,9 +1,12 @@
 # OpenSimulator REST PHP library and command-line client
 
-![Version 1.0.6](https://badgen.net/badge/Version/1.0.6/999999)
-![Stable 1.0.6](https://badgen.net/badge/Stable/1.0.6/00aa00)
-![Requires PHP 7.4](https://badgen.net/badge/PHP/7.4+/7884bf)
-![License AGPLv3](https://badgen.net/badge/License/AGPLv3/552b55)
+![Stable](https://img.shields.io/github/release/GuduleLapointe/opensim-rest-php?label=stable&color=green&include_prerelease)
+![GitHub Tag](https://img.shields.io/github/tag/GuduleLapointe/opensim-rest-php?label=latest&include_prereleases)
+![GitHub commits since latest release](https://img.shields.io/github/commits-since/GuduleLapointe/opensim-rest-php/latest?label=dev)
+![PHP](https://img.shields.io/badge/PHP-8.2+-7884bf)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-552b55)](LICENSE)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/GuduleLapointe/opensim-rest-php/total)
+[![Donate](https://img.shields.io/badge/-Donate-yellow)](https://magiiic.org/donate/)
 
 This library allows to communicate with Robust or OpenSimulator instance with rest console enabled.
 
@@ -87,6 +90,7 @@ composer require magicoli/opensim-rest-php
 ```
 
 Then in your PHP code:
+
 ```php
 require_once 'vendor/autoload.php';
 
@@ -128,6 +132,7 @@ git read-tree -m -u HEAD
 ```
 
 This will give you only the files you need:
+
 ```
 opensim-rest/
 ├── class-rest.php
@@ -137,6 +142,7 @@ opensim-rest/
 ```
 
 Then in your PHP code:
+
 ```php
 require_once dirname(__FILE__) . '/opensim-rest/class-rest.php';
 // Same usage as above
@@ -146,5 +152,4 @@ require_once dirname(__FILE__) . '/opensim-rest/class-rest.php';
 
 You won't get updates...
 
-[Download class-rest.php file](https://raw.githubusercontent.com/magicoli/opensim-rest-php/master/class-rest.php) in your project or 
-
+[Download class-rest.php file](https://raw.githubusercontent.com/magicoli/opensim-rest-php/master/class-rest.php) in your project or
