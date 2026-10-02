@@ -7,40 +7,41 @@
  *   php -d phar.readonly=off src/bin/build-phar.php
  **/
 
-$baseDir    = dirname( __DIR__ );
-$execName   = 'opensim-rest-cli';
+$baseDir = dirname(__DIR__);
+$execName = 'opensim-rest-cli';
 $executable = "$baseDir/bin/$execName";
-$pharFile   = $executable . '.phar';
+$pharFile = $executable . '.phar';
 
 // Create a new Phar archive
-$phar = new Phar( $pharFile, 0, "$execName.phar" );
+$phar = new Phar($pharFile, 0, "$execName.phar");
 
 // Start buffering for Phar creation
 $phar->startBuffering();
 
 // Add files to the Phar archive
 // The code only, not the development tools (vendor, tests, dev)
-$phar->buildFromDirectory( $baseDir, '#^(?!.*/(vendor|tests|dev)/).*\.php$#' );
+$phar->buildFromDirectory($baseDir, '#^(?!.*/(vendor|tests|dev)/).*\.php$#');
 
 // Set the default stub for the Phar archive
-$defaultStub = $phar->createDefaultStub( 'opensim-rest-cli.php' );
+$defaultStub = $phar->createDefaultStub('opensim-rest-cli.php');
 
 // Customize the stub if needed
 $stub = "#!/usr/bin/env php\n" . $defaultStub;
 
 // Set the custom stub
-$phar->setStub( $stub );
+$phar->setStub($stub);
 
 // Compress the Phar file using gzip compression
-$phar->compressFiles( Phar::GZ );
+$phar->compressFiles(Phar::GZ);
 
 // Stop buffering and write the Phar archive to disk
 $phar->stopBuffering();
 
 // Rename the Phar file to remove the extension
-rename( $pharFile, $executable );
+rename($pharFile, $executable);
 
 // Set executable permissions on the renamed file
-chmod( $executable, 0755 );
+chmod($executable, 0755);
 
 echo "Executable file created: $executable\n";
+
