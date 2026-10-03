@@ -1,5 +1,9 @@
 ## Changelog
 
+### 1.1.1
+
+- update formatting rules, composer update, reindent composer.json
+
 ### 1.1.0
 
 - new `opensim-rest-cli`, the command-line client of the library, with the options of the former client of the OpenSim kit (`--ini`, `--host`, `--url`, `--wait`, standard input, `--repl`); the phar is built with the current `OpenSim_Rest`
