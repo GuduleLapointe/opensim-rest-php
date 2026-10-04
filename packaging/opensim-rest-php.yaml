@@ -1,0 +1,32 @@
+# The library and the command-line client of the REST console of OpenSimulator, built by dev/build.sh (or apt-package)
+# from build/opensim-rest-php, prepared by packaging/build. ${VERSION} comes from packaging/version.
+# The files in /usr/share/opensim-rest-php, the command opensim-rest-cli in /usr/bin.
+name: opensim-rest-php
+arch: all
+platform: linux
+version: ${VERSION}
+version_schema: semver
+section: php
+priority: optional
+maintainer: Gudule Lapointe <gudule@speculoos.world>
+description: |-
+  REST console client for OpenSimulator and Robust
+  PHP library (OpenSim_Rest) and command-line client (opensim-rest-cli) to
+  send commands to the remote console of a Robust or OpenSimulator instance,
+  from the config of the instance or from a URL, a user and a password.
+homepage: https://github.com/GuduleLapointe/opensim-rest-php
+license: AGPL-3.0-or-later
+
+depends:
+  - php-cli (>= 2:8.2)
+  - php-curl
+  - php-xml
+
+contents:
+  - src: build/opensim-rest-php
+    dst: /usr/share/opensim-rest-php
+    type: tree
+  - src: packaging/opensim-rest-cli
+    dst: /usr/bin/opensim-rest-cli
+    file_info:
+      mode: 0755

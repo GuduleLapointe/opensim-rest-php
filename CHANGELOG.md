@@ -1,5 +1,9 @@
 ## Changelog
 
+### Unreleased
+
+- new: `dev/build.sh` makes the Debian package and the zip
+
 ### 1.1.1
 
 - update formatting rules, composer update, reindent composer.json

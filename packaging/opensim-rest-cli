@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec php /usr/share/opensim-rest-php/opensim-rest-cli.php "$@"

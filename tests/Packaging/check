@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Tries the files of dist/ (made by dev/build.sh) in a clean container (podman): the Debian package installs and
+# its command runs, the zip is used without composer. Exits non-zero when a check fails.
+#
+#   tests/Packaging/check [base image]       default: Debian 12; docker.io/library/ubuntu:24.04 for another
+
+set -e
+BASE=${1:-docker.io/library/debian:bookworm}
+cd "$(dirname "$0")/../.."
+
+podman run --rm --memory=400m -v "$PWD/dist:/dist:ro" "$BASE" bash -c '
+status=0
+check() { if eval "$2"; then echo "   ok: $1"; else echo "   FAILED: $1"; status=1; fi; }
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq >/dev/null
+apt-get install -y -qq unzip /dist/*.deb >/dev/null 2>&1
+
+check "the package is installed, it depends on PHP" "dpkg -s opensim-rest-php | grep -q \"^Depends: php-cli\""
+check "its files are in /usr/share/opensim-rest-php" "[ -f /usr/share/opensim-rest-php/class-rest.php ] && [ -f /usr/share/opensim-rest-php/opensim-rest-cli.php ]"
+check "the command runs" "opensim-rest-cli --help | grep -q Usage"
+check "the library loads" "php -r \"require \\\"/usr/share/opensim-rest-php/class-rest.php\\\"; exit(class_exists(\\\"OpenSim_Rest\\\") ? 0 : 1);\""
+
+mkdir /tmp/zip && cd /tmp/zip && unzip -q /dist/*.zip
+check "the zip has the library and its vendor folder" "[ -f opensim-rest-php/class-rest.php ] && [ -f opensim-rest-php/vendor/autoload.php ]"
+check "the zip has no composer.lock, no tests" "[ ! -e opensim-rest-php/composer.lock ] && [ ! -e opensim-rest-php/tests ]"
+check "the client runs from the zip" "php opensim-rest-php/opensim-rest-cli.php --help | grep -q Usage"
+check "the library loads through the autoloader of the zip" "php -r \"require \\\"/tmp/zip/opensim-rest-php/vendor/autoload.php\\\"; exit(class_exists(\\\"OpenSim_Rest\\\") ? 0 : 1);\""
+exit $status'
