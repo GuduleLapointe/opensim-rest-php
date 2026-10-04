@@ -1,24 +1,13 @@
 #!/usr/bin/env bash
-# dist/opensim-rest-php-VERSION.zip: the files of packaging/files as committed (HEAD) and the vendor folder composer makes
-# without the development tools, to unzip and use without composer or any other tool:
-#   php opensim-rest-php/opensim-rest-cli.php --help
-#   require 'opensim-rest-php/vendor/autoload.php';
+# dist/opensim-rest-php-VERSION.zip: the project and its vendor folder (see packaging/stage), to unzip and use without
+# composer or any other tool.
 
 set -e
 cd "$(dirname "$0")/.."
 
 eval "$(packaging/version)"
-stage=build/zip
-folder=$stage/opensim-rest-php
-rm -rf "$stage"
-mkdir -p "$folder" dist
-# The lock comes along to install what it says, and goes away after: composer works on the copy, never on the project
-# shellcheck disable=SC2046
-git archive HEAD $(cat packaging/files) composer.lock | tar -x -C "$folder"
-composer install --no-dev --no-interaction --quiet --optimize-autoloader --working-dir="$folder"
-rm -f "$folder/composer.lock"
-chmod -R u+rwX,go+rX,go-w "$folder"
-
+packaging/stage build/zip/opensim-rest-php zip
+mkdir -p dist
 rm -f "dist/opensim-rest-php-$VERSION.zip"
-(cd "$stage" && zip -qr "$PWD/../../dist/opensim-rest-php-$VERSION.zip" opensim-rest-php)
+(cd build/zip && zip -qr "$OLDPWD/dist/opensim-rest-php-$VERSION.zip" opensim-rest-php)
 echo "dist/opensim-rest-php-$VERSION.zip"
