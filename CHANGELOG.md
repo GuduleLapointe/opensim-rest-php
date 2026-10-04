@@ -6,10 +6,10 @@
 
 ### 1.1.0
 
-- new `opensim-rest-cli`, the command-line client of the library, with the options of a former client (`--ini`, `--host`, `--url`, `--wait`, standard input, `--repl`); the phar is built with the current `OpenSim_Rest`
-- update `OpenSim_Rest::command()` waits for the prompt and tells questions and a closed console; `sendCommand()` is unchanged for its callers
-- update PHP 8.2 is the minimum (composer platform 8.2.0), the extensions needed are declared, `curl_close` is gone (deprecated in PHP 8.5)
-- update the code is formatted from `.editorconfig` and `.prettierrc.json` (single quotes, PSR-12)
-- update tests: a pest suite checks the PHP minimum and compatibility, and the client and `OpenSim_Rest` run against a console fixture
-- update `magicoli/php-bump-library` is not a dependency anymore, `symfony/process` is 6.4.25
+- new: `opensim-rest-cli`, command-line client (`--ini`, `--host`, `--url`, `--wait`, stdin, `--repl`)
+- update: `OpenSim_Rest::command()` waits for the prompt, tells questions and a closed console
+- update: PHP 8.2 minimum, extensions declared, no `curl_close` (deprecated in 8.5)
+- update: code formatted from `.editorconfig` and `.prettierrc.json`
+- update: pest suite, the client runs against a console fixture
+- update: `magicoli/php-bump-library` dropped, `symfony/process` 6.4.25
 - fix the console port lookup of the client
