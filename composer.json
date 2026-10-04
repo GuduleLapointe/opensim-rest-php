@@ -38,5 +38,6 @@
             "dealerdirect/phpcodesniffer-composer-installer": true,
             "pestphp/pest-plugin": true
         }
-    }
+    },
+    "minimum-stability": "dev"
 }
