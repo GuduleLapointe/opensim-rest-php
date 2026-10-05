@@ -2,6 +2,7 @@
 
 ### Unreleased
 
+- new: `dev/switch.sh` and `dev/release.sh`, the steps of a release
 - new: `dev/build.sh` makes the Debian package and the zip
 
 ### 1.1.1
