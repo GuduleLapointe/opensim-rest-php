@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "858a695e6b2f1cb873c415f1c154dbc5",
+    "content-hash": "423253cfe88973c5a12e1b9dc2cd3e31",
     "packages": [],
     "packages-dev": [
         {
@@ -440,16 +440,16 @@
         },
         {
             "name": "magicoli/bash-tools",
-            "version": "1.0.5",
+            "version": "1.0.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/magicoli/bash-tools.git",
-                "reference": "28bc96a7bb9327c8996ec2c448290c7dda5277fe"
+                "reference": "b4425142a024b9413686e19e126d1c256b32a8cb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/magicoli/bash-tools/zipball/28bc96a7bb9327c8996ec2c448290c7dda5277fe",
-                "reference": "28bc96a7bb9327c8996ec2c448290c7dda5277fe",
+                "url": "https://api.github.com/repos/magicoli/bash-tools/zipball/b4425142a024b9413686e19e126d1c256b32a8cb",
+                "reference": "b4425142a024b9413686e19e126d1c256b32a8cb",
                 "shasum": ""
             },
             "bin": [
@@ -485,9 +485,9 @@
             "description": "Eclectic collection of bash tools and helpers.",
             "support": {
                 "issues": "https://github.com/magicoli/bash-tools/issues",
-                "source": "https://github.com/magicoli/bash-tools/tree/1.0.5"
+                "source": "https://github.com/magicoli/bash-tools/tree/1.0.6"
             },
-            "time": "2026-10-05T14:58:00+00:00"
+            "time": "2026-10-05T15:18:25+00:00"
         },
         {
             "name": "magicoli/pest-failure-summary",
