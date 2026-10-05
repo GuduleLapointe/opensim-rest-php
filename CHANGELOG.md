@@ -2,6 +2,8 @@
 
 ### Unreleased
 
+- update: `dev/` runs [build-tools](https://github.com/magicoli/build-tools) instead of its own copy of the scripts
+
 ### 1.1.2
 
 - new: `dev/release.sh` makes the whole release, `dev/switch.sh` the composer part

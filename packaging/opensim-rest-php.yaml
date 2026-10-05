@@ -1,5 +1,5 @@
 # The library and the command-line client of the REST console of OpenSimulator, built by dev/build.sh (or apt-package)
-# from build/opensim-rest-php, prepared by packaging/build. ${VERSION} comes from packaging/version.
+# from build/opensim-rest-php, prepared by packaging/build. ${VERSION} comes from build-tools.
 # The files in /usr/share/opensim-rest-php, the command opensim-rest-cli in /usr/bin.
 name: opensim-rest-php
 arch: all
