@@ -1,5 +1,7 @@
 ## Changelog
 
+### Unreleased
+
 ### 1.1.2
 
 - new: `dev/release.sh` makes the whole release, `dev/switch.sh` the composer part
