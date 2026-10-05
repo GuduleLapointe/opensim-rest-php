@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f8eef4458c0c1d286924903dddfb5f00",
+    "content-hash": "42b8daf9aae1ee8ada1838bf31d28e74",
     "packages": [],
     "packages-dev": [
         {
@@ -437,6 +437,57 @@
                 "source": "https://github.com/Jean85/pretty-package-versions/tree/2.x"
             },
             "time": "2026-06-22T07:11:19+00:00"
+        },
+        {
+            "name": "magicoli/bash-tools",
+            "version": "1.0.4",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/magicoli/bash-tools.git",
+                "reference": "1e55f10704070f6e445f42ea0644f1e2121466d4"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/magicoli/bash-tools/zipball/1e55f10704070f6e445f42ea0644f1e2121466d4",
+                "reference": "1e55f10704070f6e445f42ea0644f1e2121466d4",
+                "shasum": ""
+            },
+            "bin": [
+                "bin/cpuinfo",
+                "bin/bash-helpers",
+                "bin/mail-report",
+                "bin/randompassword",
+                "bin/stamp",
+                "bin/stampfile",
+                "bin/tildelete",
+                "bin/titlecase",
+                "bin/tts",
+                "bin/ucfirst",
+                "bin/webnormalize",
+                "bin/wtclient"
+            ],
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Magicoli\\BashHelpers\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "AGPL-3.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "Olivier van Helden",
+                    "homepage": "https://magiiic.com"
+                }
+            ],
+            "description": "Eclectic collection of bash tools and helpers.",
+            "support": {
+                "issues": "https://github.com/magicoli/bash-tools/issues",
+                "source": "https://github.com/magicoli/bash-tools/tree/1.0.4"
+            },
+            "time": "2026-09-30T12:31:49+00:00"
         },
         {
             "name": "magicoli/pest-failure-summary",
