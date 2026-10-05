@@ -3,12 +3,20 @@
 # its command runs, the zip is used without composer. Exits non-zero when a check fails.
 #
 #   tests/Packaging/check [base image]       default: Debian 12; docker.io/library/ubuntu:24.04 for another
+#   CONTAINER_CONNECTION=name                run it on the podman of another machine
+#   MEMORY=400m                              memory of the container
 
-set -e
+set -eo pipefail
 BASE=${1:-docker.io/library/debian:bookworm}
 cd "$(dirname "$0")/../.."
 
-podman run --rm --memory=400m -v "$PWD/dist:/dist:ro" "$BASE" bash -c '
+# What the container needs is sent to it as a tar stream, so it can run on any machine:
+# CONTAINER_CONNECTION=name (see podman system connection) uses the podman of another one
+stage=$(mktemp -d)
+trap 'rm -rf "$stage"' EXIT
+ln -s "$PWD/dist" "$stage/dist"
+COPYFILE_DISABLE=1 tar -chf - -C "$stage" dist | podman run --rm -i --memory="${MEMORY:-400m}" "$BASE" bash -c '
+tar -xf - --no-same-owner --warning=no-unknown-keyword -C /
 status=0
 check() { if eval "$2"; then echo "   ok: $1"; else echo "   FAILED: $1"; status=1; fi; }
 export DEBIAN_FRONTEND=noninteractive
